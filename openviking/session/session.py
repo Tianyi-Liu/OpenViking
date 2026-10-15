@@ -43,7 +43,9 @@ from openviking.session.extraction_batch import (
     ExtractionMessageBatch,
     estimate_extraction_message_tokens,
     plan_extraction_batches,
+    plan_long_term_extraction_batches,
     resolve_extraction_batch_limits,
+    should_batch_long_term_extraction,
 )
 from openviking.session.memory.constants import AGENT_EVOLUTION_MEMORY_TYPES
 from openviking.session.memory.utils.language import resolve_output_language_from_conversation
@@ -55,6 +57,10 @@ from openviking.session.retention import (
     fit_active_messages_to_budget,
     is_user_query,
     plan_retention,
+)
+from openviking.session.topic_continuity import (
+    TopicContinuityOptions,
+    resolve_topic_continuity_check,
 )
 from openviking.session.tool_output_externalizer import ToolOutputExternalizer
 from openviking.session.working_memory import (
@@ -1952,8 +1958,15 @@ class Session:
             [str, str, List[Message], Callable[[], Awaitable[Any]]],
             Awaitable[Any],
         ],
+        topic: Optional[TopicContinuityOptions] = None,
+        continuity_check: Optional[Callable[..., bool]] = None,
     ) -> Any:
-        batches = plan_extraction_batches(messages, limits)
+        batches = plan_long_term_extraction_batches(
+            messages,
+            limits,
+            topic=topic,
+            continuity_check=continuity_check,
+        )
         if not batches:
             return []
 
@@ -1983,6 +1996,7 @@ class Session:
 
         for batch_number, batch in enumerate(batches, start=1):
             batch_messages = list(batch.messages)
+            owned_messages = batch.owned_messages()
 
             async def _extract_and_merge(
                 batch_messages: List[Message] = batch_messages,
@@ -2017,7 +2031,7 @@ class Session:
             result = await record_batch(
                 f"long_term_memory_extraction_batch_{batch_number}",
                 "long_term",
-                batch_messages,
+                owned_messages,
                 _extract_and_merge,
             )
             if isinstance(result, dict):
@@ -2249,6 +2263,12 @@ class Session:
 
                     # Summary and V3 long-term memory extraction run concurrently.
                     memory_extraction_enabled = ov_config.memory.extraction_enabled
+                    topic_continuity = TopicContinuityOptions.from_config(
+                        getattr(ov_config.memory, "topic_continuity", None)
+                    )
+                    topic_for_extraction = (
+                        topic_continuity if topic_continuity.enabled else None
+                    )
                     config_session_skill_extraction_enabled = (
                         ov_config.memory.session_skill_extraction_enabled
                     )
@@ -2314,7 +2334,16 @@ class Session:
                                     event_search_tags=event_search_tags,
                                 )
 
-                            if extraction_batch_limits.enabled:
+                            if should_batch_long_term_extraction(
+                                extraction_batch_limits, topic_for_extraction
+                            ):
+                                continuity_check = None
+                                if topic_for_extraction is not None:
+                                    continuity_check = await resolve_topic_continuity_check(
+                                        messages=long_term_messages,
+                                        resolver=self._vlm_resolver,
+                                        account_id=self.ctx.account_id,
+                                    )
                                 extraction_tasks.append(
                                     self._extract_long_term_memories_with_batching(
                                         messages=long_term_messages,
@@ -2322,6 +2351,8 @@ class Session:
                                         archive_uri=archive_uri,
                                         extract_batch=_run_long_term_memory_extraction,
                                         record_batch=_run_recorded_memory_step,
+                                        topic=topic_for_extraction,
+                                        continuity_check=continuity_check,
                                     )
                                 )
                             else:
