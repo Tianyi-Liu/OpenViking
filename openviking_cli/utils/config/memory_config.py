@@ -54,6 +54,37 @@ class TopicContinuityConfig(BaseModel):
     model_config = {"extra": "forbid"}
 
 
+class MidtermMemoryConfig(BaseModel):
+    """Transient dialogue-pair staging before long-term extraction."""
+
+    enabled: bool = Field(
+        default=False,
+        description=(
+            "Build deterministic adjacent-speaker dialogue records before long-term "
+            "memory extraction for optional independent vector recall. Long-term "
+            "extraction continues to consume the original archive messages."
+        ),
+    )
+    delete_after_extraction: bool = Field(
+        default=True,
+        description=(
+            "Delete a mid-term record only after all of its source message IDs are "
+            "marked as having produced long-term memory output. Unconverted and failed "
+            "records remain available for recall and retry."
+        ),
+    )
+    vector_index_enabled: bool = Field(
+        default=False,
+        description=(
+            "Publish deterministic dialogue-pair copies below the peer's "
+            "memories/midterm_qa directory and index them with vectors_only. "
+            "Archive staging may still be deleted after extraction."
+        ),
+    )
+
+    model_config = {"extra": "forbid"}
+
+
 class MemoryConfig(BaseModel):
     """Memory configuration for OpenViking."""
 
@@ -141,6 +172,12 @@ class MemoryConfig(BaseModel):
             "same commit before calling extract_long_term_memories. A dedicated "
             "query_planner decides topic changes; without one, only a configured "
             "time gap and max_turns split the archive. Disabled by default."
+        ),
+    )
+    midterm_memory: MidtermMemoryConfig = Field(
+        default_factory=MidtermMemoryConfig,
+        description=(
+            "Optional dialogue-pair staging and vector-recall publication."
         ),
     )
 

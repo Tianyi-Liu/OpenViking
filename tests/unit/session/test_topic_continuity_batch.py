@@ -294,6 +294,34 @@ def test_openviking_config_loads_topic_continuity_and_rejects_unknown_keys():
         )
 
 
+def test_openviking_config_loads_midterm_memory_and_rejects_unknown_keys():
+    from openviking_cli.utils.config.open_viking_config import OpenVikingConfig
+
+    default_config = OpenVikingConfig.from_dict({})
+    assert default_config.memory.midterm_memory.enabled is False
+    assert default_config.memory.midterm_memory.delete_after_extraction is True
+    assert default_config.memory.midterm_memory.vector_index_enabled is False
+
+    enabled_config = OpenVikingConfig.from_dict(
+        {
+            "memory": {
+                "midterm_memory": {
+                    "enabled": True,
+                    "delete_after_extraction": True,
+                    "vector_index_enabled": True,
+                }
+            }
+        }
+    )
+    assert enabled_config.memory.midterm_memory.enabled is True
+    assert enabled_config.memory.midterm_memory.vector_index_enabled is True
+
+    with pytest.raises(ValueError):
+        OpenVikingConfig.from_dict(
+            {"memory": {"midterm_memory": {"enabled": True, "unknown_field": 1}}}
+        )
+
+
 def test_parse_same_topic_fail_open_on_unclear_text():
     assert parse_same_topic('{"same_topic": false}') is False
     assert parse_same_topic("yes") is True

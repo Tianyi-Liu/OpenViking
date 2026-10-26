@@ -270,6 +270,11 @@
         "extraction_output_format": "python",
         "maintenance_review_tokens": 1000,
         "session_skill_extraction_enabled": false,
+        "midterm_memory": {
+            "enabled": false,
+            "delete_after_extraction": true,
+            "vector_index_enabled": false,
+        },
     },
     "ingest": {
         "enabled": false,
@@ -295,6 +300,10 @@
             "server_url": null,
             "api_key_type": "user",
             "api_key": null,
+            "memory_recall_midterm_enabled": false,
+            "memory_recall_midterm_limit": 10,
+            "memory_recall_midterm_max_chars": 6000,
+            "memory_recall_midterm_min_score": 0.25,
         },
     },
     "log": {

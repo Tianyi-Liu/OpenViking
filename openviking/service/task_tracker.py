@@ -499,6 +499,42 @@ class TaskTracker:
                 updated.updated_at = self._next_updated_at(task)
                 await self._persist_and_publish("update", updated, previous=task)
 
+    async def release_long_term_extraction(
+        self,
+        task_id: str,
+        *,
+        account_id: str,
+        user_id: str,
+    ) -> Optional[TaskRecord]:
+        """Release a deferred session commit after its mid-term barrier.
+
+        The release bit is persisted in task metadata so a recovered QueueFS
+        worker observes it after a process restart.  Repeated releases are
+        idempotent.
+        """
+
+        self._validate_owner(account_id, user_id)
+        async with self._task_locks.acquire(task_id):
+            task = await self._load_for_update(task_id, account_id, user_id)
+            if task is None:
+                return None
+            if task.task_type != "session_commit":
+                raise ValueError("Only session_commit tasks support long-term release")
+            if task.status in _TERMINAL_STATUSES:
+                if task.meta.get("long_term_release_requested") is True:
+                    return self._copy(task)
+                raise ValueError("Session commit task is already terminal")
+            readiness = task.meta.get("midterm_memory_ready")
+            if not isinstance(readiness, dict) or readiness.get("ready") is not True:
+                raise ValueError("Session commit has not reached midterm_ready")
+
+            updated = deepcopy(task)
+            updated.meta["long_term_release_requested"] = True
+            updated.stage = "long_term_released"
+            updated.updated_at = self._next_updated_at(task)
+            await self._persist_and_publish("update", updated, previous=task)
+            return self._copy(updated)
+
     async def update_task_auth(
         self,
         task_id: str,

@@ -359,6 +359,11 @@ Provider 和密钥管理配置见[加密指南](../guides/08-encryption.md)。
     "link_enabled": false,
     "topic_continuity": {
       "enabled": false
+    },
+    "midterm_memory": {
+      "enabled": false,
+      "delete_after_extraction": true,
+      "vector_index_enabled": false
     }
   }
 }
@@ -376,6 +381,7 @@ Provider 和密钥管理配置见[加密指南](../guides/08-encryption.md)。
 | `session_skill_extraction_enabled` | boolean | `false` | 是否同时抽取可复用 Skill |
 | `link_enabled` | boolean | `false` | 是否生成和解析记忆链接 |
 | `topic_continuity` | object | 见下表 | 长期记忆提取前是否按相邻 Turn 话题连续性分组，默认关闭 |
+| `midterm_memory` | object | 见下表 | 将相邻说话人块暂存为中期对话记录，用于可选的独立向量召回 |
 
 自动提交还需要单独设置策略：记忆抽取开关不会让会话自动提交。详见[配置指南](../guides/01-configuration.md)的 `memory.session_auto_commit` 和[会话 API](../api/05-sessions.md)。模板目录的加载顺序和生效方式见 [Prompt 指南](../guides/10-prompt-guide.md)。
 
@@ -392,6 +398,16 @@ Provider 和密钥管理配置见[加密指南](../guides/08-encryption.md)。
 | `skip_max_user_chars` | integer，`>= 0` | `0` | 用户提问总字符不超过该值则跳过该组；`0` 不跳过 |
 
 配置了独立 `query_planner` 时，由它判断相邻 Turn 是否仍是同一话题。超时、异常或无法解析的回复都保持连续。没有独立 planner 时不会调用提取用的 VLM；此时若 `time_gap_seconds=0`，开启后只按 `max_turns` 切组。切开发生在同一次 commit 内部。
+
+`midterm_memory` 字段（均可选；默认关闭）：
+
+| 字段 | 类型 | 默认值 | 作用 |
+|---|---|---|---|
+| `enabled` | boolean | `false` | 合并连续同名消息、配对相邻发言块，并暂存为可选的向量召回记录 |
+| `delete_after_extraction` | boolean | `true` | 仅删除其全部原始消息都已标记为产出长期记忆的中期记录；未转化或失败的记录继续保留 |
+| `vector_index_enabled` | boolean | `false` | 将确定性副本保存到 `memories/midterm_qa`，并以 `vectors_only` 模式建立独立召回索引 |
+
+archive 下的中期记录是临时记录。启用 `vector_index_enabled` 后，会在所属 peer 的 `memories/midterm_qa` 下保留独立的确定性召回副本，即使 archive 暂存记录被删除也仍可召回。长期记忆继续从原始 archive 消息提取，并保持原有的 topic continuity 和分批行为。
 
 ## 解析器配置
 

@@ -639,7 +639,11 @@ class MessageRange:
 
     @staticmethod
     def _speaker_for(message: Message) -> str:
-        return getattr(message, "peer_id", None) or message.role
+        return (
+            getattr(message, "speaker", None)
+            or getattr(message, "peer_id", None)
+            or message.role
+        )
 
     def _can_merge_messages(self, previous: Message, current: Message) -> bool:
         previous_meta = self._chunk_meta_for(previous)

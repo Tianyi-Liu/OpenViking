@@ -360,6 +360,11 @@ See [Encryption](../guides/08-encryption.md) for provider and key-management set
     "link_enabled": false,
     "topic_continuity": {
       "enabled": false
+    },
+    "midterm_memory": {
+      "enabled": false,
+      "delete_after_extraction": true,
+      "vector_index_enabled": false
     }
   }
 }
@@ -377,6 +382,7 @@ See [Encryption](../guides/08-encryption.md) for provider and key-management set
 | `session_skill_extraction_enabled` | boolean | `false` | Also extract reusable skills |
 | `link_enabled` | boolean | `false` | Generate and resolve memory links |
 | `topic_continuity` | object | see below | Group adjacent Turns by topic continuity before long-term extraction; off by default |
+| `midterm_memory` | object | see below | Stage adjacent speaker blocks as dialogue pairs for optional independent vector recall |
 
 Automatic commits require a separate policy; enabling memory extraction does not make sessions commit automatically. See `memory.session_auto_commit` in [Configuration](../guides/01-configuration.md) and the [Sessions API](../api/05-sessions.md). For template loading order and when changes take effect, see the [Prompt Guide](../guides/10-prompt-guide.md).
 
@@ -393,6 +399,16 @@ Automatic commits require a separate policy; enabling memory extraction does not
 | `skip_max_user_chars` | integer, `>= 0` | `0` | Skip a group when owned user-query text is at most this many characters; `0` never skips |
 
 When a dedicated `query_planner` is configured, it decides whether neighboring Turns stay one topic. A timeout, error, or unclear reply stays continuous. Without that planner, the extraction model is not called; with `time_gap_seconds=0`, the flag then splits only on `max_turns`. The split stays inside one commit.
+
+`midterm_memory` fields (all optional; off by default):
+
+| Field | Type | Default | Purpose |
+|---|---|---|---|
+| `enabled` | boolean | `false` | Merge consecutive same-speaker messages, pair adjacent blocks, and stage them for optional vector-recall publication |
+| `delete_after_extraction` | boolean | `true` | Delete only records whose source message IDs are marked as having produced long-term memory output; retain unconverted and failed records |
+| `vector_index_enabled` | boolean | `false` | Keep deterministic copies under `memories/midterm_qa` and index them with `vectors_only` for independent recall |
+
+Archive staging records are transient. When `vector_index_enabled` is true, a separate deterministic recall copy remains under the owning peer's `memories/midterm_qa` directory even if archive staging is deleted. Long-term extraction continues to use the original archive messages and its normal topic-continuity/batching behavior.
 
 ## Parser Settings
 

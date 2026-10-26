@@ -657,6 +657,12 @@ class OpenVikingConfig(BaseModel):
     memory_recall_entities_limit: int = 10
     memory_recall_preferences_limit: int = 3
     memory_recall_max_chars: int = 4000
+    # Mid-term dialogue evidence is recalled independently so it never consumes
+    # the long-term event/entity/preference quotas above.
+    memory_recall_midterm_enabled: bool = False
+    memory_recall_midterm_limit: int = Field(default=10, ge=0)
+    memory_recall_midterm_max_chars: int = Field(default=6000, ge=1)
+    memory_recall_midterm_min_score: float = Field(default=0.25, ge=0.0, le=1.0)
     # How many experience memories to fetch per call to get_viking_experience_context.
     exp_recall_limit: int = 5
     # Also search matching structured case memories. When enabled, VikingBot
